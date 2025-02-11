@@ -3,9 +3,6 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/utils/getCurrentUser";
 
 
-import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-
 // ✅ PATCH - Update an existing task
 export async function PATCH(req, { params }) {
   const { id: organizationId, taskId } = await params;
