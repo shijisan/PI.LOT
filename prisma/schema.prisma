@@ -1,0 +1,166 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id             String             @id @default(uuid()) @db.Uuid
+  username       String             @unique
+  email          String             @unique
+  password       String
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  organizations  OrganizationUser[]
+  ownedOrgs      Organization[]     @relation("UserOwnedOrgs")
+  tasks          Task[]
+  messages       Message[]
+  notifications  Notification[]
+  ChatroomMember ChatroomMember[]
+}
+
+model Organization {
+  id        String             @id @default(uuid()) @db.Uuid
+  name      String
+  ownerId   String             @db.Uuid
+  owner     User               @relation("UserOwnedOrgs", fields: [ownerId], references: [id])
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+  members   OrganizationUser[]
+  chatrooms Chatroom[]
+  labels    Label[]
+  contacts  Contact[]
+  tasks     Task[]
+}
+
+model OrganizationUser {
+  id             String       @id @default(uuid()) @db.Uuid
+  userId         String       @db.Uuid
+  organizationId String       @db.Uuid
+  role           Role         @default(MEMBER)
+  user           User         @relation(fields: [userId], references: [id])
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  labelId        String?      @db.Uuid
+  label          Label?       @relation(fields: [labelId], references: [id])
+
+  @@unique([userId, organizationId])
+}
+
+enum Role {
+  OWNER
+  MODERATOR
+  MEMBER
+}
+
+model Label {
+  id             String             @id @default(uuid()) @db.Uuid
+  name           String
+  color          String?
+  organizationId String             @db.Uuid
+  organization   Organization       @relation(fields: [organizationId], references: [id])
+  members        OrganizationUser[]
+  chatroomAccess ChatroomAccess[]
+
+  @@unique([name, organizationId])
+}
+
+model Chatroom {
+  id             String           @id @default(uuid()) @db.Uuid
+  name           String
+  description    String?
+  organizationId String           @db.Uuid
+  organization   Organization     @relation(fields: [organizationId], references: [id])
+  labelAccess    ChatroomAccess[]
+  messages       Message[]
+  members        ChatroomMember[] // ✅ Added relation for chatroom members
+}
+
+model ChatroomMember {
+  id         String   @id @default(uuid()) @db.Uuid
+  chatroomId String   @db.Uuid
+  userId     String   @db.Uuid
+  chatroom   Chatroom @relation(fields: [chatroomId], references: [id])
+  user       User     @relation(fields: [userId], references: [id])
+
+  @@unique([chatroomId, userId]) // ✅ Ensures a user cannot join the same chatroom twice
+}
+
+model ChatroomAccess {
+  id         String   @id @default(uuid()) @db.Uuid
+  chatroomId String   @db.Uuid
+  labelId    String   @db.Uuid
+  canRead    Boolean  @default(true)
+  canWrite   Boolean  @default(false)
+  chatroom   Chatroom @relation(fields: [chatroomId], references: [id])
+  label      Label    @relation(fields: [labelId], references: [id])
+
+  @@unique([chatroomId, labelId])
+}
+
+model Message {
+  id         String   @id @default(uuid()) @db.Uuid
+  chatroomId String   @db.Uuid
+  senderId   String   @db.Uuid
+  sender     User     @relation(fields: [senderId], references: [id])
+  content    String
+  createdAt  DateTime @default(now())
+  chatroom   Chatroom @relation(fields: [chatroomId], references: [id])
+
+  @@index([chatroomId])
+}
+
+model Notification {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  user      User     @relation(fields: [userId], references: [id])
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model Contact {
+  id             String       @id @default(uuid()) @db.Uuid
+  name           String
+  email          String?      @unique
+  phone          String?
+  position       String?
+  company        String?
+  notes          String?
+  organizationId String       @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}
+
+model Task {
+  id             String       @id @default(uuid()) @db.Uuid
+  title          String
+  description    String?
+  status         TaskStatus   @default(PENDING)
+  dueDate        DateTime?
+  priority       TaskPriority @default(NORMAL)
+  assignedToId   String?      @db.Uuid
+  assignedTo     User?        @relation(fields: [assignedToId], references: [id])
+  organizationId String       @db.Uuid
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum TaskPriority {
+  LOW
+  NORMAL
+  HIGH
+}
